@@ -116,11 +116,27 @@ tr.clicavel td:first-child { font-weight: 600; }
 .bloco .cartoes { box-shadow: none; margin-bottom: 0; }
 
 /* entrada */
-.entrada { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: #100f24; position: relative; overflow: hidden; color: #fff; }
-.entrada::before, .entrada::after { content: ''; position: absolute; border-radius: 50%; filter: blur(90px); opacity: .55; animation: deriva 16s ease-in-out infinite alternate; }
-.entrada::before { width: 520px; height: 520px; background: var(--marca); top: -180px; left: -120px; }
-.entrada::after { width: 460px; height: 460px; background: var(--aurora); bottom: -200px; right: -120px; animation-delay: -8s; opacity: .35; }
-@keyframes deriva { to { transform: translate(60px, 40px) scale(1.12); } }
+.entrada { min-height: 100vh; display: grid; place-items: center; padding: 20px; background: #0d0c22; position: relative; overflow: hidden; color: #fff; }
+@property --resp { syntax: '<percentage>'; inherits: false; initial-value: 125%; }
+.fundo-entrada { position: absolute; inset: 0; overflow: hidden; animation: chega 2s cubic-bezier(.25, .1, .25, 1) both; }
+.fundo-entrada i { position: absolute; inset: 0; animation: respira 9s ease-in-out infinite alternate;
+  background: radial-gradient(var(--resp) var(--resp) at 50% 20%, #0d0c22 35%, var(--marca) 50%, #ff8fb4 60%, #ff8a3d 70%, #ffd166 80%, var(--aurora) 90%, #3d5afe 100%); }
+@keyframes chega { from { transform: scale(1.5); } }
+@keyframes respira { from { --resp: 117%; } to { --resp: 135%; } }
+.pilha-entrada { position: relative; z-index: 1; width: 100%; max-width: 420px; margin-top: 70px; }
+.gato { position: absolute; left: 50%; bottom: 100%; width: 150px; margin: 0 0 -1px -75px; overflow: visible; z-index: 2; pointer-events: none; --ox: 0px; --oy: 0px; }
+.gato .pelo, .gato .patas rect { fill: #fff; }
+.gato .patas rect { stroke: #dcd9f2; stroke-width: 1.2; }
+.gato .orelha, .gato .nariz { fill: color-mix(in srgb, var(--marca) 45%, #ffb3cf); }
+.gato .rosado { fill: #ffb3cf; opacity: .55; }
+.gato .traco { fill: none; stroke: #b9b5d9; stroke-width: 1.6; stroke-linecap: round; }
+.gato .rabo { fill: none; stroke: #fff; stroke-width: 12; stroke-linecap: round; transform-origin: 132px 100px; animation: abana 3.2s ease-in-out infinite alternate; }
+.gato .olhos { transform: translate(var(--ox), var(--oy)); transition: transform .12s ease-out; }
+.gato .olho { transform-box: fill-box; transform-origin: center; animation: pisca 5.5s infinite; transition: transform .18s; }
+.gato .olho ellipse { fill: #15142b; } .gato .olho circle { fill: #fff; }
+.gato.timido .olho { animation: none; transform: scaleY(.1); }
+@keyframes abana { from { transform: rotate(-9deg); } to { transform: rotate(10deg); } }
+@keyframes pisca { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
 .cartao-entrada { position: relative; z-index: 1; background: rgba(255, 255, 255, .97); color: var(--tinta); border-radius: 26px; padding: 34px; width: 100%; max-width: 420px; box-shadow: 0 40px 100px -30px rgba(0, 0, 0, .7); }
 .cartao-entrada h1 { font-size: 22px; margin: 14px 0 20px; }
 .marca { font: 700 19px/1 var(--titulo); letter-spacing: -.03em; color: var(--tinta); text-decoration: none; display: inline-flex; align-items: center; gap: 9px; }
@@ -310,7 +326,7 @@ tr.clicavel td:first-child { font-weight: 600; }
 .cor-livre { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--mudo); cursor: pointer; padding: 3px 10px 3px 3px; border: 1px solid var(--borda); border-radius: 11px; }
 .cor-livre input { width: 28px; height: 28px; min-height: 0; padding: 0; border: 0; border-radius: 8px; background: none; cursor: pointer; }
 .campo > select + input { margin-top: 2px; }
-.cartao-entrada { max-height: calc(100vh - 40px); overflow: auto; }
+.cartao-entrada { max-height: calc(100vh - 120px); overflow: auto; }
 .previa-pagina { border: 1px solid var(--borda); border-radius: 18px; overflow: hidden; max-width: 380px; background: color-mix(in srgb, var(--tema) 8%, var(--fundo)); }
 .pp-capa { height: 96px; background: linear-gradient(135deg, color-mix(in srgb, var(--tema) 80%, #fff), color-mix(in srgb, var(--tema) 70%, #15142b)) center/cover; }
 .pp-cartao { margin: -30px 16px 16px; background: #fff; border-radius: 16px; padding: 0 14px 16px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; box-shadow: var(--sombra); }
