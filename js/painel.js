@@ -14,6 +14,50 @@ const ERROS_AUTH = {
 const erroAuth = e => new Error(ERROS_AUTH[e.message] || (/at least 6/.test(e.message) ? 'A senha deve ter ao menos 6 caracteres.' : e.message));
 
 /* ---------- entrada ---------- */
+// Fundo que "respira" e o gatinho que espia por cima do cartão: acompanha o cursor e fecha os olhos na senha.
+function Palco({ children }) {
+  const gato = useRef(null);
+  useEffect(() => {
+    const g = gato.current; if (!g) return;
+    const mover = e => {
+      const r = g.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height * .6);
+      const d = Math.hypot(dx, dy) || 1, f = Math.min(1, d / 220) * 3.2;
+      g.style.setProperty('--ox', (dx / d * f).toFixed(2) + 'px');
+      g.style.setProperty('--oy', (dy / d * f).toFixed(2) + 'px');
+    };
+    const foco = e => g.classList.toggle('timido', e.type === 'focusin' && e.target.type === 'password');
+    const pilha = g.parentElement;
+    window.addEventListener('pointermove', mover, { passive: true });
+    pilha.addEventListener('focusin', foco); pilha.addEventListener('focusout', foco);
+    return () => { window.removeEventListener('pointermove', mover); pilha.removeEventListener('focusin', foco); pilha.removeEventListener('focusout', foco); };
+  }, []);
+  return html`
+    <div class="entrada">
+      <div class="fundo-entrada" aria-hidden="true"><i></i></div>
+      <div class="pilha-entrada">
+        <svg ref=${gato} class="gato" viewBox="0 0 160 96" aria-hidden="true">
+          <path class="rabo" d="M132 100 C150 84 152 60 140 44" />
+          <g>
+            <path class="pelo" d="M40 46 L44 8 L74 30 Z M120 46 L116 8 L86 30 Z" />
+            <path class="orelha" d="M47 36 L49 19 L63 30 Z M113 36 L111 19 L97 30 Z" />
+            <ellipse class="pelo" cx="80" cy="66" rx="47" ry="38" />
+            <circle class="rosado" cx="50" cy="78" r="7" /><circle class="rosado" cx="110" cy="78" r="7" />
+            <g class="olhos">
+              <g class="olho"><ellipse cx="62" cy="62" rx="7" ry="8.5" /><circle cx="64.5" cy="58.5" r="2.4" /></g>
+              <g class="olho"><ellipse cx="98" cy="62" rx="7" ry="8.5" /><circle cx="100.5" cy="58.5" r="2.4" /></g>
+            </g>
+            <path class="nariz" d="M76.5 73 h7 l-3.5 4 Z" />
+            <path class="traco" d="M80 77 q-4 6 -9 3 M80 77 q4 6 9 3 M44 68 l-16 -3 M44 73 l-16 2 M116 68 l16 -3 M116 73 l16 2" />
+          </g>
+          <g class="patas"><rect x="42" y="86" width="26" height="19" rx="9.5" /><rect x="92" y="86" width="26" height="19" rx="9.5" />
+            <path class="traco" d="M51 97 v5 M59 97 v5 M101 97 v5 M109 97 v5" /></g>
+        </svg>
+        ${children}
+      </div>
+    </div>`;
+}
+
 function Entrar() {
   const [modo, setModo] = useState('entrar');
   const [aviso, setAviso] = useState('');
@@ -41,7 +85,7 @@ function Entrar() {
     setOc(false);
   };
   return html`
-    <div class="entrada">
+    <${Palco}>
       <form class="cartao-entrada" onSubmit=${enviar}>
         <div class="marca">${APP_NOME}</div>
         <h1>${modo === 'entrar' ? 'Entrar no painel' : modo === 'criar' ? 'Criar conta' : 'Recuperar senha'}</h1>
@@ -56,7 +100,7 @@ function Entrar() {
           ${modo === 'entrar' ? html`<button type="button" class="btn link" onClick=${() => setModo('esqueci')}>Esqueci a senha</button>` : ''}
         </div>
       </form>
-    </div>`;
+    <//>`;
 }
 
 function NovaSenha({ onFim }) {
@@ -65,9 +109,9 @@ function NovaSenha({ onFim }) {
     e.preventDefault();
     if (await tentar(async () => { const { error } = await db.auth.updateUser({ password: s }); if (error) throw erroAuth(error); }, 'Senha alterada.')) onFim();
   };
-  return html`<div class="entrada"><form class="cartao-entrada" onSubmit=${salvar}><div class="marca">${APP_NOME}</div><h1>Criar nova senha</h1>
+  return html`<${Palco}><form class="cartao-entrada" onSubmit=${salvar}><div class="marca">${APP_NOME}</div><h1>Criar nova senha</h1>
     <${Campo} label="Nova senha"><input type="password" required minlength="6" value=${s} onInput=${e => setS(e.target.value)} /><//>
-    <button class="btn largo">Salvar senha</button></form></div>`;
+    <button class="btn largo">Salvar senha</button></form><//>`;
 }
 
 function CriarEmpresa({ onPronto, email }) {
@@ -83,7 +127,7 @@ function CriarEmpresa({ onPronto, email }) {
     if (ok) onPronto();
   };
   return html`
-    <div class="entrada">
+    <${Palco}>
       <form class="cartao-entrada" onSubmit=${enviar}>
         <div class="marca">${APP_NOME}</div>
         <h1>Vamos configurar sua empresa</h1>
@@ -98,7 +142,7 @@ function CriarEmpresa({ onPronto, email }) {
         <button class="btn largo" disabled=${oc}>${oc ? 'Criando…' : 'Criar empresa'}</button>
         <div class="trocas"><button type="button" class="btn link" onClick=${() => db.auth.signOut()}>Sair</button></div>
       </form>
-    </div>`;
+    <//>`;
 }
 
 /* ---------- início ---------- */
