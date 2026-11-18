@@ -1,5 +1,5 @@
 // Estrutura do painel: entrada, criação da empresa, menu, início e minha conta.
-import { html, render, useState, useEffect, db, q, tentar, toast, copiar, useForm, Campo, APP_NOME, linkPublico, aplicarTema, SeletorRamo, SeletorCor, COR_POR_RAMO,
+import { html, render, useState, useEffect, useRef, db, q, tentar, toast, copiar, useForm, Campo, APP_NOME, linkPublico, aplicarTema, SeletorRamo, SeletorCor, COR_POR_RAMO,
   brl, fone, fData, hoje, addDias, h5, DIAS_C, dt, NIVEIS, seloStatus } from './lib.js';
 import { Clientes, Categorias, Servicos, Adicionais, Profissionais } from './cadastros.js';
 import { Agenda, Agendamentos, AgModal } from './agenda.js';
@@ -216,6 +216,84 @@ function Conta({ ctx }) {
     </div>`;
 }
 
+/* ---------- avisos (sino): agendamento novo, cancelado, remarcado, pagamento ---------- */
+function bip() {
+  try {
+    const a = new (window.AudioContext || window.webkitAudioContext)();
+    const o = a.createOscillator(), g = a.createGain();
+    o.connect(g); g.connect(a.destination);
+    o.frequency.value = 880; g.gain.setValueAtTime(0.08, a.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + 0.35);
+    o.start(); o.stop(a.currentTime + 0.36);
+  } catch { /* som é opcional */ }
+}
+const haQuanto = iso => {
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000));
+  return m < 1 ? 'agora' : m < 60 ? `há ${m} min` : m < 1440 ? `há ${Math.floor(m / 60)} h` : `há ${Math.floor(m / 1440)} d`;
+};
+function Sino({ ctx }) {
+  const [ls, setLs] = useState([]);
+  const [aberto, setAberto] = useState(false);
+  const [perm, setPerm] = useState(typeof Notification === 'undefined' ? 'sem' : Notification.permission);
+  const vistos = useRef(null);
+  const carregar = async avisar => {
+    const { data } = await db.from('notificacoes').select('*').order('id', { ascending: false }).limit(30);
+    if (!data) return;
+    if (avisar && vistos.current) {
+      const novas = data.filter(n => !vistos.current.has(n.id)).reverse();
+      novas.forEach(n => {
+        toast(`${n.titulo}: ${n.texto}`, n.tipo === 'cancelado' ? 'aviso' : 'ok');
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && (document.hidden || !document.hasFocus())) {
+          try { new Notification(n.titulo, { body: n.texto, tag: `aviso-${n.id}` }); } catch { /* alguns navegadores só permitem pelo aplicativo instalado */ }
+        }
+      });
+      if (novas.length) { bip(); window.dispatchEvent(new Event('ag-mudou')); }
+    }
+    vistos.current = new Set(data.map(n => n.id));
+    setLs(data);
+  };
+  useEffect(() => {
+    carregar(false);
+    const t = setInterval(() => carregar(true), 40000);
+    const canal = db.channel(`avisos-${ctx.empresa.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificacoes', filter: `empresa_id=eq.${ctx.empresa.id}` }, () => carregar(true))
+      .subscribe();
+    const foco = () => carregar(true);
+    window.addEventListener('focus', foco);
+    return () => { clearInterval(t); db.removeChannel(canal); window.removeEventListener('focus', foco); };
+  }, []);
+  const novas = ls.filter(n => !n.lida).length;
+  useEffect(() => { document.title = `${novas ? `(${novas}) ` : ''}${APP_NOME} — painel`; }, [novas]);
+  const marcar = async ids => {
+    if (!ids.length) return;
+    setLs(l => l.map(n => (ids.includes(n.id) ? { ...n, lida: true } : n)));
+    await db.from('notificacoes').update({ lida: true }).in('id', ids);
+  };
+  const abrir = n => { marcar([n.id]); setAberto(false); if (n.agendamento_id) ctx.abrirAg({ id: n.agendamento_id }); };
+  const pedir = async () => setPerm(await Notification.requestPermission());
+  return html`
+    <div class="sino">
+      <button class="sino-btn ${novas ? 'tem' : ''}" onClick=${() => setAberto(!aberto)} aria-label=${novas ? `Avisos: ${novas} não lidos` : 'Avisos'} aria-expanded=${aberto}>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        ${novas ? html`<b>${novas > 9 ? '9+' : novas}</b>` : ''}
+      </button>
+      ${aberto ? html`
+        <div class="sino-veu" onClick=${() => setAberto(false)}></div>
+        <div class="sino-lista" role="dialog" aria-label="Avisos">
+          <div class="sino-topo"><b>Avisos</b>${novas ? html`<button class="btn link peq" onClick=${() => marcar(ls.filter(n => !n.lida).map(n => n.id))}>Marcar todos como lidos</button>` : ''}</div>
+          ${ls.length === 0 ? html`<p class="mudo sino-vazio">Nenhum aviso ainda. Quando um cliente agendar pelo link, aparece aqui.</p>` : ''}
+          <div class="sino-itens">${ls.map(n => html`
+            <button class="sino-item ${n.lida ? '' : 'novo'} ${n.tipo}" onClick=${() => abrir(n)}>
+              <i></i><span><b>${n.titulo}</b><small>${n.texto}</small><small class="mudo">${haQuanto(n.criado_em)}</small></span>
+            </button>`)}</div>
+          <div class="sino-pe">
+            ${perm === 'default' ? html`<button class="btn sec peq" onClick=${pedir}>Ativar avisos do navegador</button>`
+              : perm === 'granted' ? html`<small class="mudo">Avisos do navegador ativados: você é avisado mesmo com o painel em outra aba.</small>`
+              : perm === 'denied' ? html`<small class="mudo">Os avisos do navegador estão bloqueados. Libere nas permissões do site para recebê-los.</small>` : ''}
+          </div>
+        </div>` : ''}
+    </div>`;
+}
+
 /* ---------- menu e rotas ---------- */
 const MENU = [
   [null, [['inicio', 'Início', 1, Inicio], ['agenda', 'Agenda', 1, Agenda], ['agendamentos', 'Agendamentos', 1, Agendamentos]]],
@@ -280,6 +358,7 @@ function App() {
           <b class="empresa">${ctx.empresa.nome}</b>
           <span class="espaco"></span>
           ${ctx.nivel >= 2 ? html`<button class="btn peq" onClick=${() => setAg({})}>+ Novo agendamento</button>` : ''}
+          <${Sino} ctx=${ctx} />
           <a class="usuario" href="#/conta">${ctx.prof.nome.split(' ')[0]}</a>
         </header>
         <${Pagina} ctx=${ctx} key=${atual[0]} />
