@@ -360,3 +360,23 @@ tr.clicavel td:first-child { font-weight: 600; }
 .pontos { display: flex; justify-content: center; gap: 6px; padding: 10px 0 0; } .pontos i { width: 7px; height: 7px; border-radius: 50%; background: #d3d5e4; } .pontos i.on { background: var(--tema); width: 18px; border-radius: 99px; }
 .visor-txt { padding: 16px 20px 20px; } .visor-txt h2 { font-size: 21px; margin-bottom: 4px; } .visor-txt .btn { margin-top: 6px; }
 @media (max-width: 860px) { .catalogo { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .item-txt { padding: 10px 11px 2px; } .item > .btn { margin: 8px 11px 11px; } .sem-foto { font-size: 40px; } }
+
+/* avisos (sino) */
+.sino { position: relative; }
+.sino-btn { position: relative; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--borda); background: #fff; color: var(--tinta); cursor: pointer; display: grid; place-items: center; }
+.sino-btn:hover { border-color: color-mix(in srgb, var(--marca) 45%, var(--borda)); }
+.sino-btn.tem { color: var(--marca); }
+.sino-btn b { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 99px; background: #e5344e; color: #fff; font-size: 11.5px; font-weight: 700; display: grid; place-items: center; border: 2px solid var(--fundo); }
+.sino-veu { position: fixed; inset: 0; z-index: 29; }
+.sino-lista { position: absolute; right: 0; top: calc(100% + 10px); z-index: 30; width: min(380px, calc(100vw - 28px)); background: #fff; border: 1px solid var(--borda); border-radius: 18px; box-shadow: 0 30px 60px -24px rgba(21, 20, 43, .4); overflow: hidden; }
+.sino-topo { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px 10px; font: 600 15px var(--titulo); }
+.sino-vazio { padding: 4px 16px 16px; margin: 0; }
+.sino-itens { max-height: min(420px, 60vh); overflow: auto; }
+.sino-item { display: flex; gap: 10px; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--linha); background: #fff; font: inherit; padding: 11px 16px; cursor: pointer; }
+.sino-item:hover { background: #f8f8ff; }
+.sino-item i { width: 9px; height: 9px; border-radius: 50%; margin-top: 6px; flex: none; background: transparent; }
+.sino-item.novo { background: color-mix(in srgb, var(--marca) 6%, #fff); } .sino-item.novo i { background: var(--marca); }
+.sino-item.novo.cancelado i { background: #e5344e; } .sino-item.novo.pagamento i { background: var(--ok); }
+.sino-item span { display: flex; flex-direction: column; gap: 1px; min-width: 0; } .sino-item b { font-weight: 600; }
+.sino-pe { padding: 10px 16px 14px; border-top: 1px solid var(--linha); } .sino-pe:empty { display: none; }
+@media (max-width: 860px) { .sino-lista { position: fixed; right: 14px; left: 14px; top: 62px; width: auto; } }
