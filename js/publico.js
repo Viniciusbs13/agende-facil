@@ -47,6 +47,27 @@ function Calendario({ servicos, adicionais, prof, ignorar, limiteDias, valor, on
     </div>`;
 }
 
+/* ---------- pagamento online (Mercado Pago) ---------- */
+async function pagarOnline(agendamento, telefone) {
+  const { data, error } = await db.functions.invoke('pagamentos', { body: { acao: 'criar', slug, telefone, agendamento,
+    retorno: `${location.origin}${location.pathname}?e=${encodeURIComponent(slug)}` } });
+  if (error || !data || data.erro) throw new Error((data && data.erro) || 'Não foi possível iniciar o pagamento. Tente de novo.');
+  location.href = data.url;
+}
+function PagarBloco({ pix, ag, tel }) {
+  const [oc, setOc] = useState(false);
+  const valor = Math.max(0, valorPix(pix, ag.valor_total) - Number(ag.pago || 0));
+  if (!(valor > 0)) return '';
+  return html`
+    <div class="pix">
+      <h3>Pagamento</h3>
+      <p>${pix.tipo === 'fixo' || pix.tipo === 'percentual' ? 'Sinal para garantir o horário' : 'Valor do agendamento'}: <b>${brl(valor)}</b></p>
+      <button class="btn" disabled=${oc} onClick=${async () => { setOc(true); await tentar(() => pagarOnline(ag.id, tel)); setOc(false); }}>${oc ? 'Abrindo…' : 'Pagar com PIX ou cartão'}</button>
+      <p class="mudo peq">Você será levado ao Mercado Pago e volta para cá quando terminar.</p>
+      ${pix.instrucoes ? html`<p class="mudo">${pix.instrucoes}</p>` : ''}
+    </div>`;
+}
+
 /* ---------- pagamento via PIX na confirmação ---------- */
 function PixBloco({ pix, total, empresa, ag, nome }) {
   const valor = valorPix(pix, total);
@@ -219,14 +240,15 @@ function Fluxo({ d, x, inicial, onClose }) {
       ${etapa === 'ok' ? html`
         <p class="destaque ok-cor">✓ Agendamento confirmado!</p>
         ${resumo(feito)}
-        ${x.pix ? html`<${PixBloco} pix=${x.pix} total=${feito.valor_total} empresa=${d.empresa} ag=${feito} nome=${cliente?.nome || nome} />` : ''}
+        ${x.pix && x.pix.modo === 'mercadopago' ? (x.mp_ativo ? html`<${PagarBloco} pix=${x.pix} ag=${feito} tel=${tel} />` : '')
+          : x.pix ? html`<${PixBloco} pix=${x.pix} total=${feito.valor_total} empresa=${d.empresa} ag=${feito} nome=${cliente?.nome || nome} />` : ''}
         ${cfg.msg_final ? html`<p class="recado">${cfg.msg_final}</p>` : ''}
         ${cfg.msg_politica ? html`<h3>Política de cancelamento</h3><p class="mudo">${cfg.msg_politica}</p>` : ''}` : ''}
     <//>`;
 }
 
 /* ---------- área do cliente ---------- */
-function Conta({ d }) {
+function Conta({ d, x }) {
   const [tel, setTel] = useState(lerTel());
   const [dig, setDig] = useState('');
   const [c, setC] = useState(undefined);
@@ -284,10 +306,11 @@ function Conta({ d }) {
       ${lista.map(a => html`
         <div class="cartao-ag">
           <div class="quando"><b>${a.data.slice(8)}</b><span>${MESES[Number(a.data.slice(5, 7)) - 1].slice(0, 3).toUpperCase()}</span><small>${DIAS[dt(a.data).getDay()]}</small></div>
-          <div class="meio"><span class="selo ${a.status}">${STATUS[a.status]}</span><b>${a.servicos.map(s => s.nome).join(', ')}</b>
+          <div class="meio"><span><span class="selo ${a.status}">${STATUS[a.status]}</span>${Number(a.pago) > 0 ? html` <span class="selo pago">Pago ${brl(a.pago)}</span>` : ''}</span><b>${a.servicos.map(s => s.nome).join(', ')}</b>
             <small class="mudo">${a.hora_inicio} · ${a.profissional}</small></div>
           <div class="acoes">
             <button class="btn link peq" onClick=${() => setVer(a)}>Ver detalhes ›</button>
+            ${futuro(a) && x.mp_ativo && valorPix(x.pix, a.valor_total) - Number(a.pago || 0) > 0 ? html`<button class="btn peq" onClick=${() => tentar(() => pagarOnline(a.id, tel))}>Pagar</button>` : ''}
             ${futuro(a) ? html`<button class="btn link peq" onClick=${() => { setQuando(null); setRem(a); }}>Remarcar</button>
               <button class="btn link peq perigo" onClick=${() => cancelar(a)}>Cancelar</button>` : ''}
           </div>
@@ -320,6 +343,20 @@ function Pagina() {
   const [fluxo, setFluxo] = useState(null);
   const [x, setX] = useState({ pix: null, campos: [], ramo: null, galeria: [] });
   const [zoom, setZoom] = useState(null);
+  const [volta, setVolta] = useState(0);
+  // retorno do Mercado Pago: confere o pagamento e mostra a Área do Cliente
+  useEffect(() => {
+    const pg = new URLSearchParams(location.search).get('pg');
+    if (!pg) return;
+    history.replaceState(null, '', `${location.pathname}?e=${encodeURIComponent(slug)}#conta`);
+    setConta(true);
+    db.functions.invoke('pagamentos', { body: { acao: 'verificar', pagamento: pg } }).then(({ data }) => {
+      const s = data && data.status;
+      toast(s === 'aprovado' ? 'Pagamento confirmado. Obrigado!' : s === 'recusado' ? 'O pagamento não foi aprovado. Você pode tentar de novo.'
+        : 'Pagamento em processamento. Assim que for confirmado, aparece aqui.', s === 'recusado' ? 'erro' : s === 'aprovado' ? 'ok' : 'aviso');
+      setVolta(v => v + 1);
+    });
+  }, []);
   const [conta, setConta] = useState(location.hash === '#conta');
   useEffect(() => {
     tentar(async () => setD(await q(db.rpc('pub_empresa', { p_slug: slug }))));
@@ -354,7 +391,7 @@ function Pagina() {
           <p class="mudo">${conta ? 'Área do Cliente' : e.slogan}</p>
           ${!conta ? html`<button class="btn grande" onClick=${() => setFluxo({})}>Agendar agora</button>` : ''}
         </div>
-        ${conta ? html`<${Conta} d=${d} />` : html`
+        ${conta ? html`<${Conta} d=${d} x=${x} key=${volta} />` : html`
           ${msg.ativo && (msg.titulo || msg.texto) ? html`<div class="recado ${msg.tipo}"><b>${msg.titulo}</b>${msg.texto ? html`<p>${msg.texto}</p>` : ''}</div>` : ''}
           ${sec.servicos !== false && d.servicos.length ? html`
             <h2 class="secao">Serviços</h2>

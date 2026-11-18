@@ -29,7 +29,7 @@ export function Configuracoes({ ctx }) {
     if (!v.nome?.trim()) return toast('Informe o nome da empresa.', 'erro');
     if (!/^[a-z0-9-]{2,40}$/.test(v.slug || '')) return toast('O endereço da página deve ter de 2 a 40 letras minúsculas, números ou hífen.', 'erro');
     if (!horariosValidos(v.horarios)) return toast('Confira os horários de funcionamento: o início deve ser antes do fim.', 'erro');
-    if (pix.ativo && !String(pix.chave || '').trim()) return toast('Informe a chave PIX ou desative o pagamento via PIX.', 'erro');
+    if (pix.ativo && (pix.modo || 'manual') === 'manual' && !String(pix.chave || '').trim()) return toast('Informe a chave PIX ou desative a cobrança pelo link.', 'erro');
     const { id, criado_em, ...dados } = v;
     Object.keys(dados).forEach(k => { if (dados[k] === '') dados[k] = null; });
     if (await tentar(() => q(db.from('empresas').update(dados).eq('id', id)), 'Configurações salvas.')) { setSujo(false); ctx.recarregar(); }
@@ -135,28 +135,38 @@ export function Configuracoes({ ctx }) {
 
       ${aba === 'pagamentos' ? html`
         <section class="bloco">
-          <h2>Pagamento via PIX</h2>
-          <${Chk} label="Aceitar pagamento via PIX no link de agendamento" checked=${!!pix.ativo} onChange=${e => setPix({ ativo: e.target.checked })}
-            dica="Ao confirmar o agendamento, o cliente vê o valor, o QR code e o código copia e cola. A conferência é manual: você confere o recebimento e registra o pagamento no agendamento." />
+          <h2>Pagamento no link de agendamento</h2>
+          <${Chk} label="Cobrar pelo link de agendamento" checked=${!!pix.ativo} onChange=${e => setPix({ ativo: e.target.checked })}
+            dica="Depois de confirmar o agendamento, o cliente vê o valor e a forma de pagar." />
           ${pix.ativo ? html`
             <div class="grade2">
-              <${Campo} label="Tipo de pagamento">
+              <${Campo} label="Como receber">
+                <select value=${pix.modo || 'manual'} onChange=${e => setPix({ modo: e.target.value })}>
+                  ${op([['manual', 'PIX manual (sua chave, você confere)'], ['mercadopago', 'Mercado Pago (PIX e cartão, baixa automática)']])}
+                </select>
+              <//>
+              <${Campo} label="Quanto cobrar">
                 <select value=${pix.tipo || 'total'} onChange=${e => setPix({ tipo: e.target.value })}>${op([['total', 'Valor total do agendamento'], ['fixo', 'Sinal fixo'], ['percentual', 'Sinal percentual']])}</select>
               <//>
               ${pix.tipo === 'fixo' ? html`<${Campo} label="Valor do sinal (R$)" req><input type="number" min="0" step="0.01" value=${pix.valor_fixo ?? ''} onInput=${e => setPix({ valor_fixo: e.target.value })} /><//>` : ''}
               ${pix.tipo === 'percentual' ? html`<${Campo} label="Percentual do agendamento (%)" req><input type="number" min="1" max="100" value=${pix.percentual ?? ''} onInput=${e => setPix({ percentual: e.target.value })} /><//>` : ''}
-              <${Campo} label="Tipo da chave">
-                <select value=${pix.tipo_chave || 'cpf'} onChange=${e => setPix({ tipo_chave: e.target.value })}>${op([['cpf', 'CPF'], ['cnpj', 'CNPJ'], ['email', 'E-mail'], ['telefone', 'Telefone'], ['aleatoria', 'Aleatória']])}</select>
-              <//>
-              <${Campo} label="Chave PIX" req><input value=${pix.chave || ''} onInput=${e => setPix({ chave: e.target.value })} /><//>
-              <${Campo} label="Nome do recebedor" dica="Como aparece no banco. Até 25 letras, sem acentos."><input value=${pix.nome || ''} onInput=${e => setPix({ nome: e.target.value })} placeholder=${v.nome} /><//>
-              <${Campo} label="Cidade do recebedor"><input value=${pix.cidade || ''} onInput=${e => setPix({ cidade: e.target.value })} placeholder=${v.cidade || ''} /><//>
             </div>
-            <${Campo} label="Instruções" dica="Texto mostrado ao cliente junto do PIX.">
+            ${(pix.modo || 'manual') === 'manual' ? html`
+              <h3>PIX manual</h3>
+              <p class="mudo peq">O cliente vê o QR code e o código copia e cola da sua chave. O dinheiro cai direto na sua conta; você confere e registra o pagamento no agendamento.</p>
+              <div class="grade2">
+                <${Campo} label="Tipo da chave">
+                  <select value=${pix.tipo_chave || 'cpf'} onChange=${e => setPix({ tipo_chave: e.target.value })}>${op([['cpf', 'CPF'], ['cnpj', 'CNPJ'], ['email', 'E-mail'], ['telefone', 'Telefone'], ['aleatoria', 'Aleatória']])}</select>
+                <//>
+                <${Campo} label="Chave PIX" req><input value=${pix.chave || ''} onInput=${e => setPix({ chave: e.target.value })} /><//>
+                <${Campo} label="Nome do recebedor" dica="Como aparece no banco. Até 25 letras, sem acentos."><input value=${pix.nome || ''} onInput=${e => setPix({ nome: e.target.value })} placeholder=${v.nome} /><//>
+                <${Campo} label="Cidade do recebedor"><input value=${pix.cidade || ''} onInput=${e => setPix({ cidade: e.target.value })} placeholder=${v.cidade || ''} /><//>
+              </div>
+              <${Chk} label="Mostrar botão “Enviar comprovante pelo WhatsApp”" checked=${pix.botao_comprovante !== false} onChange=${e => setPix({ botao_comprovante: e.target.checked })} />` : html`
+              <${MercadoPago} />`}
+            <${Campo} label="Instruções" dica="Texto mostrado ao cliente junto do pagamento.">
               <textarea rows="2" value=${pix.instrucoes || ''} onInput=${e => setPix({ instrucoes: e.target.value })}></textarea>
-            <//>
-            <${Chk} label="Mostrar botão “Enviar comprovante pelo WhatsApp”" checked=${pix.botao_comprovante !== false} onChange=${e => setPix({ botao_comprovante: e.target.checked })} />
-            <p class="mudo peq">A confirmação automática do pagamento depende de contratar um provedor de pagamentos; por enquanto ela é manual.</p>` : ''}
+            <//>` : ''}
         </section>` : ''}
 
       ${aba === 'pagina' ? html`
@@ -282,6 +292,29 @@ function DatasBloqueadas({ ctx }) {
           <${Campo} label="Motivo"><input ...${f.txt('motivo')} placeholder="Opcional" /><//>
         <//>` : ''}
     </section>`;
+}
+
+function MercadoPago() {
+  const [st, setSt] = useState(null);
+  const [tok, setTok] = useState('');
+  const carregar = () => tentar(async () => setSt(await q(db.rpc('mp_conectado'))));
+  useEffect(() => { carregar(); }, []);
+  const salvar = async valor => {
+    if (valor === '' && !confirm('Desconectar o Mercado Pago? Os clientes deixam de conseguir pagar online.')) return;
+    if (await tentar(() => q(db.rpc('mp_salvar_token', { p_token: valor })), valor ? 'Mercado Pago conectado.' : 'Mercado Pago desconectado.')) { setTok(''); carregar(); }
+  };
+  return html`
+    <h3>Mercado Pago</h3>
+    <p class="mudo peq">O cliente paga por PIX ou cartão na página do Mercado Pago e o agendamento recebe a baixa sozinho. O dinheiro vai para a sua conta do Mercado Pago, que cobra a taxa dele por pagamento.</p>
+    <p>${st == null ? html`<span class="mudo">Verificando…</span>` : st.conectado
+      ? html`<span class="selo ok">Conectado${st.teste ? ' (credencial de teste)' : ''}</span> <button type="button" class="btn link peq perigo" onClick=${() => salvar('')}>Desconectar</button>`
+      : html`<span class="selo parcial">Não conectado</span>`}</p>
+    <${Campo} label=${st && st.conectado ? 'Trocar a credencial (Access Token)' : 'Credencial (Access Token)'}
+      dica="No Mercado Pago: Seu negócio → Configurações → Gestão e administração → Credenciais → Credenciais de produção → Access Token. Ela fica guardada no servidor e não aparece mais nesta tela.">
+      <div class="linha"><input type="password" autocomplete="off" value=${tok} onInput=${e => setTok(e.target.value)} placeholder="APP_USR-…" />
+        <button type="button" class="btn sec" disabled=${!tok.trim()} onClick=${() => salvar(tok)}>Conectar</button></div>
+    <//>
+    <p class="mudo peq">Depois de conectar, clique em “Salvar configurações” para a opção valer no link.</p>`;
 }
 
 function CamposPersonalizados({ ctx }) {
