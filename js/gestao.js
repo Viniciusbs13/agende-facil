@@ -1,6 +1,6 @@
 // Gestão: configurações da empresa, financeiro e registro de atividades.
 import { html, useState, useEffect, db, q, tentar, toast, copiar, useForm, Campo, Chk, Modal, Imagem, Horarios, horariosValidos, Lista, Selo,
-  brl, fData, hoje, addDias, addMeses, linkPublico, FORMAS, MSG_TIPOS, MSG_PADRAO, VARIAVEIS, TIPOS_CAMPO } from './lib.js';
+  brl, fData, hoje, addDias, addMeses, linkPublico, FORMAS, MSG_TIPOS, MSG_PADRAO, VARIAVEIS, TIPOS_CAMPO, SeletorRamo, SeletorCor } from './lib.js';
 
 /* ================= configurações ================= */
 const op = pares => pares.map(([v, t]) => html`<option value=${v}>${t}</option>`);
@@ -9,8 +9,6 @@ const LIMITE = [[7, '7 dias'], [15, '15 dias'], [30, '1 mês'], [60, '2 meses'],
 const SIMULT = [[1, '1 agendamento'], [2, '2 agendamentos'], [3, '3 agendamentos'], [5, '5 agendamentos'], [10, '10 agendamentos'], [0, 'Ilimitado']];
 const CANCEL = [[60, '1 hora antes'], [120, '2 horas antes'], [180, '3 horas antes'], [360, '6 horas antes'], [720, '12 horas antes'], [1440, '1 dia antes'], [2880, '2 dias antes']];
 const INTERVALO = [[5, '5 minutos'], [10, '10 minutos'], [15, '15 minutos'], [20, '20 minutos'], [30, '30 minutos'], [45, '45 minutos'], [60, '1 hora'], [90, '1 hora e 30 minutos'], [120, '2 horas']];
-const RAMOS = ['Barbearia', 'Nail Designer / Esmalteria', 'Designer de Sobrancelhas', 'Lash Designer / Cílios', 'Cabeleireira / Trancista', 'Massoterapeuta / Massagem',
-  'Estética / Depilação', 'Saúde / Médico', 'Tatuagem', 'Pet Shop', 'Fotografia', 'Lava-jato / Estética Automotiva', 'Outro ramo'];
 const UFS = 'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ');
 const ABAS = [['regras', 'Regras de agendamento'], ['empresa', 'Dados da empresa'], ['horarios', 'Horários de funcionamento'], ['datas', 'Datas bloqueadas'], ['pagina', 'Página de agendamento'],
   ['mensagens', 'Mensagens'], ['pagamentos', 'Pagamentos PIX'], ['campos', 'Campos personalizados']];
@@ -87,7 +85,7 @@ export function Configuracoes({ ctx }) {
           <div class="grade2">
             <${Campo} label="Nome da empresa" req><input ...${txt('nome')} /><//>
             <${Campo} label="Telefone / WhatsApp" req><input ...${f.tel('telefone')} onInput=${e => set('telefone', e.target.value.replace(/\D/g, '').slice(0, 11))} /><//>
-            <${Campo} label="Ramo"><select ...${txt('ramo')} onChange=${e => set('ramo', e.target.value)}><option value="">Selecione</option>${RAMOS.map(r => html`<option value=${r}>${r}</option>`)}</select><//>
+            <${Campo} label="O que a empresa faz"><${SeletorRamo} valor=${v.ramo} onChange=${x => set('ramo', x)} /><//>
             <${Campo} label="CEP"><input ...${txt('cep')} /><//>
             <${Campo} label="Logradouro"><input ...${txt('logradouro')} /><//>
             <${Campo} label="Número"><input ...${txt('numero')} /><//>
@@ -181,9 +179,24 @@ export function Configuracoes({ ctx }) {
           <div class="grade2">
             <${Campo} label="Logo"><${Imagem} valor=${v.logo_url} onChange=${u => set('logo_url', u)} pasta=${v.id} redonda /><//>
             <${Campo} label="Imagem de capa"><${Imagem} valor=${v.capa_url} onChange=${u => set('capa_url', u)} pasta=${v.id} /><//>
-            <${Campo} label="Cor do tema"><div class="linha"><input type="color" value=${v.cor_tema} onInput=${e => set('cor_tema', e.target.value)} /><input ...${txt('cor_tema')} /></div><//>
             <${Campo} label="Texto abaixo do nome da empresa"><input ...${txt('slogan')} /><//>
           </div>
+          <${Campo} label="Cor do sistema e da página" dica="Vale para o seu painel e para a página que seus clientes veem.">
+            <${SeletorCor} valor=${v.cor_tema} onChange=${x => set('cor_tema', x)} />
+          <//>
+          <h3>Prévia</h3>
+          <div class="previa-pagina" style=${`--tema:${v.cor_tema}`}>
+            <div class="pp-capa" style=${v.capa_url ? `background-image:url('${v.capa_url}')` : ''}></div>
+            <div class="pp-cartao">
+              <div class="pp-logo" style=${v.logo_url ? `background-image:url('${v.logo_url}')` : ''}>${v.logo_url ? '' : (v.nome || '?')[0]}</div>
+              <b>${v.nome}</b><small>${v.slogan}</small><span class="pp-btn">Agendar agora</span>
+            </div>
+          </div>
+        </section>
+        <section class="bloco">
+          <h2>Fotos da empresa</h2>
+          <p class="mudo peq">Aparecem em uma galeria na página de agendamento: o espaço, trabalhos realizados, a equipe. Até 12 fotos.</p>
+          <${Galeria} fotos=${c.galeria || []} pasta=${v.id} onChange=${x => cfg('galeria', x)} />
         </section>
         <section class="bloco">
           <h2>Conteúdo</h2>
@@ -201,6 +214,35 @@ export function Configuracoes({ ctx }) {
           ${[['servicos', 'Serviços'], ['equipe', 'Equipe'], ['localizacao', 'Localização'], ['horarios', 'Horários de funcionamento'], ['redes', 'Redes sociais']].map(([k, t]) => html`
             <${Chk} label=${t} checked=${secoes[k] !== false} onChange=${e => cfg('secoes', { ...secoes, [k]: e.target.checked })} />`)}
         </section>` : ''}
+    </div>`;
+}
+
+function Galeria({ fotos, pasta, onChange }) {
+  const [env, setEnv] = useState(false);
+  const enviar = async e => {
+    const arqs = [...e.target.files].slice(0, 12 - fotos.length);
+    if (!arqs.length) return;
+    setEnv(true);
+    const novas = [];
+    await tentar(async () => {
+      for (const a of arqs) {
+        if (a.size > 8 * 1024 * 1024) throw new Error('Cada foto deve ter até 8 MB.');
+        const caminho = `${pasta}/${crypto.randomUUID()}.${(a.name.split('.').pop() || 'jpg').toLowerCase()}`;
+        const { error } = await db.storage.from('imagens').upload(caminho, a);
+        if (error) throw new Error(error.message);
+        novas.push(db.storage.from('imagens').getPublicUrl(caminho).data.publicUrl);
+      }
+    });
+    if (novas.length) onChange([...fotos, ...novas]);
+    setEnv(false);
+    e.target.value = '';
+  };
+  return html`
+    <div class="galeria-ed">
+      ${fotos.map(u => html`<div class="foto-ed" style=${`background-image:url('${u}')`}>
+        <button type="button" aria-label="Remover foto" onClick=${() => onChange(fotos.filter(x => x !== u))}>×</button></div>`)}
+      ${fotos.length < 12 ? html`<label class="foto-add">${env ? 'Enviando…' : '+ Adicionar fotos'}
+        <input type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange=${enviar} disabled=${env} /></label>` : ''}
     </div>`;
 }
 

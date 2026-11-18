@@ -1,5 +1,5 @@
 // Estrutura do painel: entrada, criação da empresa, menu, início e minha conta.
-import { html, render, useState, useEffect, db, q, tentar, toast, copiar, useForm, Campo, APP_NOME, linkPublico,
+import { html, render, useState, useEffect, db, q, tentar, toast, copiar, useForm, Campo, APP_NOME, linkPublico, aplicarTema, SeletorRamo, SeletorCor, COR_POR_RAMO,
   brl, fone, fData, hoje, addDias, h5, DIAS_C, dt, NIVEIS, seloStatus } from './lib.js';
 import { Clientes, Categorias, Servicos, Adicionais, Profissionais } from './cadastros.js';
 import { Agenda, Agendamentos, AgModal } from './agenda.js';
@@ -71,11 +71,14 @@ function NovaSenha({ onFim }) {
 }
 
 function CriarEmpresa({ onPronto, email }) {
-  const f = useForm({ empresa: '', nome: '', telefone: '' });
+  const f = useForm({ empresa: '', nome: '', telefone: '', ramo: '', cor: '#5b4bff', corEscolhida: false });
+  useEffect(() => { aplicarTema(f.v.cor); }, [f.v.cor]);
+  // ao escolher o ramo, sugere uma cor que combina, até a pessoa escolher a dela
+  const mudarRamo = r => f.setV(o => ({ ...o, ramo: r, cor: !o.corEscolhida && COR_POR_RAMO[r] ? COR_POR_RAMO[r] : o.cor }));
   const [oc, setOc] = useState(false);
   const enviar = async e => {
     e.preventDefault(); setOc(true);
-    const ok = await tentar(() => q(db.rpc('criar_empresa', { p_empresa: f.v.empresa, p_nome: f.v.nome, p_telefone: f.v.telefone || null })));
+    const ok = await tentar(() => q(db.rpc('criar_empresa', { p_empresa: f.v.empresa, p_nome: f.v.nome, p_telefone: f.v.telefone || null, p_ramo: f.v.ramo || null, p_cor: f.v.cor })));
     setOc(false);
     if (ok) onPronto();
   };
@@ -88,6 +91,10 @@ function CriarEmpresa({ onPronto, email }) {
         <${Campo} label="Nome da empresa" req><input required ...${f.txt('empresa')} /><//>
         <${Campo} label="Seu nome" req><input required ...${f.txt('nome')} /><//>
         <${Campo} label="Telefone / WhatsApp"><input ...${f.tel('telefone')} /><//>
+        <${Campo} label="O que a sua empresa faz?"><${SeletorRamo} valor=${f.v.ramo} onChange=${mudarRamo} /><//>
+        <${Campo} label="Cor do seu sistema" dica="Vale para o painel e para a página que seus clientes veem. Dá para trocar depois.">
+          <${SeletorCor} valor=${f.v.cor} onChange=${c => f.setV(o => ({ ...o, cor: c, corEscolhida: true }))} />
+        <//>
         <button class="btn largo" disabled=${oc}>${oc ? 'Criando…' : 'Criar empresa'}</button>
         <div class="trocas"><button type="button" class="btn link" onClick=${() => db.auth.signOut()}>Sair</button></div>
       </form>
@@ -238,6 +245,8 @@ function App() {
   const recarregar = async () => { const d = await tentar(() => q(db.rpc('minha_sessao'))); setEu(d || null); };
   const uid = sessao?.user?.id;
   useEffect(() => { if (uid) recarregar(); else setEu(undefined); }, [uid]);
+  const corEmpresa = eu && eu.empresa ? eu.empresa.cor_tema : null;
+  useEffect(() => { aplicarTema(corEmpresa); }, [corEmpresa]);
 
   if (sessao === undefined) return html`<div class="entrada"><p class="mudo">Carregando…</p></div>`;
   if (recuperar) return html`<${NovaSenha} onFim=${() => setRecuperar(false)} />`;

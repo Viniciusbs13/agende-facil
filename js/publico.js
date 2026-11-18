@@ -1,5 +1,5 @@
 // Página pública de agendamento (link enviado aos clientes) e Área do Cliente.
-import { html, render, useState, useEffect, db, q, tentar, toast, copiar, Modal, Campo, APP_NOME, CamposExtras, camposFaltando, valorPix, pixCopiaCola,
+import { html, render, useState, useEffect, db, q, tentar, toast, copiar, Modal, Campo, APP_NOME, CamposExtras, camposFaltando, valorPix, pixCopiaCola, aplicarTema,
   brl, fone, digitos, fData, hoje, iso, dt, addDias, addMeses, duracaoTxt, DIAS, DIAS_C, MESES, STATUS } from './lib.js';
 
 const slug = new URLSearchParams(location.search).get('e') || '';
@@ -318,7 +318,8 @@ const REDES = [['instagram', 'Instagram'], ['facebook', 'Facebook'], ['tiktok', 
 function Pagina() {
   const [d, setD] = useState(undefined);
   const [fluxo, setFluxo] = useState(null);
-  const [x, setX] = useState({ pix: null, campos: [] });
+  const [x, setX] = useState({ pix: null, campos: [], ramo: null, galeria: [] });
+  const [zoom, setZoom] = useState(null);
   const [conta, setConta] = useState(location.hash === '#conta');
   useEffect(() => {
     tentar(async () => setD(await q(db.rpc('pub_empresa', { p_slug: slug }))));
@@ -330,7 +331,7 @@ function Pagina() {
   useEffect(() => {
     if (!d?.empresa) return;
     document.title = `${d.empresa.nome} — agendamento online`;
-    document.documentElement.style.setProperty('--tema', d.empresa.cor_tema || '#0f766e');
+    aplicarTema(d.empresa.cor_tema);
   }, [d]);
 
   if (d === undefined) return html`<p class="mudo centro topo-vazio">Carregando…</p>`;
@@ -349,6 +350,7 @@ function Pagina() {
         <div class="cartao-pub cabecalho">
           <div class="logo" style=${e.logo_url ? `background-image:url('${e.logo_url}')` : ''}>${e.logo_url ? '' : e.nome[0]}</div>
           <h1>${e.nome}</h1>
+          ${x.ramo && !conta ? html`<span class="ramo">${x.ramo}${e.cidade ? ` em ${e.cidade}` : ''}</span>` : ''}
           <p class="mudo">${conta ? 'Área do Cliente' : e.slogan}</p>
           ${!conta ? html`<button class="btn grande" onClick=${() => setFluxo({})}>Agendar agora</button>` : ''}
         </div>
@@ -364,6 +366,9 @@ function Pagina() {
                   <div class="txt"><b>${s.nome}</b>${s.descricao ? html`<small class="mudo">${s.descricao}</small>` : ''}<small>${duracaoTxt(s.duracao)} · <b>${preco(s)}</b></small></div>
                   <button class="btn peq" onClick=${() => setFluxo({ servico: s.id })}>Agendar</button>
                 </div>`)}</div>`)}` : ''}
+          ${(x.galeria || []).length ? html`
+            <h2 class="secao">Fotos</h2>
+            <div class="galeria">${x.galeria.map((u, i) => html`<button class="foto-g" style=${`background-image:url('${u}')`} onClick=${() => setZoom(u)} aria-label=${`Ampliar foto ${i + 1}`}></button>`)}</div>` : ''}
           ${sec.equipe !== false && d.equipe.length ? html`
             <h2 class="secao">Nossa equipe</h2>
             <div class="equipe">${d.equipe.map(p => html`<div><i class="avatar grande" style=${p.foto_url ? `background-image:url('${p.foto_url}')` : ''}>${p.foto_url ? '' : p.nome[0]}</i><span>${p.nome}</span></div>`)}</div>` : ''}
@@ -379,6 +384,8 @@ function Pagina() {
             <h2 class="secao">Redes sociais</h2>
             <div class="redes">${redes.map(([k, t]) => html`<a class="btn sec" target="_blank" rel="noopener" href=${e[k]}>${t}</a>`)}</div>` : ''}`}
       </div>
+      ${!conta && !fluxo ? html`<div class="barra-fixa"><button class="btn largo" onClick=${() => setFluxo({})}>Agendar agora</button></div>` : ''}
+      ${zoom ? html`<div class="zoom" onClick=${() => setZoom(null)} role="dialog" aria-label="Foto ampliada"><img src=${zoom} alt="Foto da empresa" /><button class="x" aria-label="Fechar">×</button></div>` : ''}
       <footer class="rodape-pub">Agendamento online por <b>${APP_NOME}</b></footer>
       ${fluxo ? html`<${Fluxo} d=${d} x=${x} inicial=${fluxo.servico} onClose=${() => setFluxo(null)} />` : ''}
     </div>`;

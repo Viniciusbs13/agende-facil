@@ -332,3 +332,42 @@ export function pixCopiaCola(pix, valor, nomePadrao) {
     + tlv('62', tlv('05', '***')) + '6304';
   return corpo + crc16(corpo);
 }
+
+/* ---------- ramo e cor da empresa ---------- */
+export const RAMOS = ['Barbearia', 'Salão de beleza', 'Cabeleireiro(a)', 'Nail Designer / Esmalteria', 'Designer de Sobrancelhas', 'Lash Designer / Cílios', 'Trancista',
+  'Maquiagem', 'Estética / Depilação', 'Massoterapia / Massagem', 'Podologia', 'Saúde / Consultório', 'Psicologia / Terapia', 'Nutrição', 'Personal / Academia',
+  'Tatuagem / Piercing', 'Pet Shop / Banho e tosa', 'Fotografia', 'Lava-jato / Estética Automotiva', 'Aulas / Consultoria'];
+export const CORES_TEMA = ['#5b4bff', '#7c3aed', '#c026d3', '#e0457b', '#dc2626', '#ea580c', '#b45309', '#0d9488', '#059669', '#0284c7', '#2563eb', '#1f2937'];
+export const COR_POR_RAMO = { 'Barbearia': '#b45309', 'Salão de beleza': '#c026d3', 'Cabeleireiro(a)': '#7c3aed', 'Nail Designer / Esmalteria': '#e0457b', 'Designer de Sobrancelhas': '#b45309',
+  'Lash Designer / Cílios': '#c026d3', 'Trancista': '#ea580c', 'Maquiagem': '#e0457b', 'Estética / Depilação': '#0d9488', 'Massoterapia / Massagem': '#059669', 'Podologia': '#0284c7',
+  'Saúde / Consultório': '#2563eb', 'Psicologia / Terapia': '#0d9488', 'Nutrição': '#059669', 'Personal / Academia': '#dc2626', 'Tatuagem / Piercing': '#1f2937',
+  'Pet Shop / Banho e tosa': '#ea580c', 'Fotografia': '#1f2937', 'Lava-jato / Estética Automotiva': '#0284c7', 'Aulas / Consultoria': '#5b4bff' };
+
+// Aplica a cor da empresa em toda a tela e escolhe texto claro ou escuro para manter a leitura.
+export function aplicarTema(cor) {
+  const c = /^#[0-9a-f]{6}$/i.test(cor || '') ? cor : '#5b4bff';
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255).map(x => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+  const st = document.documentElement.style;
+  st.setProperty('--tema', c); st.setProperty('--marca', c);
+  st.setProperty('--sobre', 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? '#15142b' : '#fff');
+}
+
+export function SeletorRamo({ valor, onChange }) {
+  const [outro, setOutro] = useState(!!valor && !RAMOS.includes(valor));
+  return html`
+    <select value=${outro ? '__outro' : valor || ''} onChange=${e => { const x = e.target.value; setOutro(x === '__outro'); onChange(x === '__outro' ? '' : x); }}>
+      <option value="">Selecione</option>
+      ${RAMOS.map(r => html`<option value=${r}>${r}</option>`)}
+      <option value="__outro">Outro (escrever)</option>
+    </select>
+    ${outro ? html`<input value=${valor || ''} onInput=${e => onChange(e.target.value)} placeholder="Escreva o que a sua empresa faz" maxlength="60" />` : ''}`;
+}
+
+export function SeletorCor({ valor, onChange }) {
+  const v = (valor || '').toLowerCase();
+  return html`
+    <div class="cores">
+      ${CORES_TEMA.map(c => html`<button type="button" class="cor ${c === v ? 'on' : ''}" style=${`background:${c}`} aria-label=${`Usar a cor ${c}`} aria-pressed=${c === v} onClick=${() => onChange(c)}></button>`)}
+      <label class="cor-livre" title="Escolher outra cor"><input type="color" value=${/^#[0-9a-f]{6}$/.test(v) ? v : '#5b4bff'} onInput=${e => onChange(e.target.value)} /><span>Outra cor</span></label>
+    </div>`;
+}
