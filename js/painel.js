@@ -3,7 +3,7 @@ import { html, render, useState, useEffect, useRef, db, q, tentar, toast, copiar
   brl, fone, fData, hoje, addDias, h5, DIAS_C, dt, NIVEIS, seloStatus } from './lib.js';
 import { Clientes, Categorias, Servicos, Adicionais, Profissionais } from './cadastros.js';
 import { Agenda, Agendamentos, AgModal } from './agenda.js';
-import { Configuracoes, Financeiro, Logs } from './gestao.js';
+import { Configuracoes, PaginaAgendamento, Financeiro, Logs } from './gestao.js';
 import { RelatorioOperacional, RelatorioFinanceiro } from './relatorios.js';
 
 const ERROS_AUTH = {
@@ -173,7 +173,7 @@ function Inicio({ ctx }) {
     ['Adicionar um profissional', true, '#/profissionais'],
     ['Adicionar um serviço', d.nServ > 0, '#/servicos'],
     ['Conferir horário de funcionamento', true, '#/configuracoes'],
-    ['Personalizar seu link de agendamento', !!(e.logo_url || e.capa_url), '#/configuracoes'],
+    ['Personalizar sua página de agendamento', !!(e.logo_url || e.capa_url), '#/pagina'],
     ['Criar seu primeiro agendamento', d.nAg > 0, '#/agenda'],
   ];
   const feitos = passos ? passos.filter(p => p[1]).length : 0;
@@ -344,7 +344,7 @@ const MENU = [
   ['Cadastros', [['clientes', 'Clientes', 3, Clientes], ['servicos', 'Serviços', 4, Servicos], ['categorias', 'Categorias', 4, Categorias],
     ['adicionais', 'Adicionais', 4, Adicionais], ['profissionais', 'Profissionais', 4, Profissionais]]],
   ['Gestão', [['financeiro', 'Financeiro', 3, Financeiro], ['relatorio-operacional', 'Relatório operacional', 1, RelatorioOperacional],
-    ['relatorio-financeiro', 'Relatório financeiro', 3, RelatorioFinanceiro], ['logs', 'Logs', 4, Logs], ['configuracoes', 'Configurações', 4, Configuracoes]]],
+    ['relatorio-financeiro', 'Relatório financeiro', 3, RelatorioFinanceiro], ['logs', 'Logs', 4, Logs], ['pagina', 'Página de agendamento', 4, PaginaAgendamento], ['configuracoes', 'Configurações', 4, Configuracoes]]],
   ['Conta', [['conta', 'Minha conta', 1, Conta]]],
 ];
 const lerRota = () => location.hash.replace(/^#\/?/, '') || 'inicio';
@@ -356,6 +356,12 @@ function App() {
   const [ag, setAg] = useState(null);
   const [menu, setMenu] = useState(false);
   const [recuperar, setRecuperar] = useState(false);
+  const [modo, setModo] = useState(document.documentElement.dataset.modo === 'escuro' ? 'escuro' : 'claro');
+  const trocarModo = () => {
+    const m = modo === 'escuro' ? 'claro' : 'escuro';
+    document.documentElement.dataset.modo = m; setModo(m);
+    try { localStorage.setItem('af-modo', m); } catch (e) { /* sem armazenamento: vale só nesta visita */ }
+  };
 
   useEffect(() => {
     db.auth.getSession().then(({ data }) => setSessao(data.session));
@@ -402,6 +408,11 @@ function App() {
           <b class="empresa">${ctx.empresa.nome}</b>
           <span class="espaco"></span>
           ${ctx.nivel >= 2 ? html`<button class="btn peq" onClick=${() => setAg({})}>+ Novo agendamento</button>` : ''}
+          <button class="modo-btn" onClick=${trocarModo} aria-label=${modo === 'escuro' ? 'Usar modo claro' : 'Usar modo escuro'} title=${modo === 'escuro' ? 'Modo claro' : 'Modo escuro'}>
+            ${modo === 'escuro'
+              ? html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" /></svg>`
+              : html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" /></svg>`}
+          </button>
           <${Sino} ctx=${ctx} />
           <a class="usuario" href="#/conta">${ctx.prof.nome.split(' ')[0]}</a>
         </header>

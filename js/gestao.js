@@ -10,11 +10,13 @@ const SIMULT = [[1, '1 agendamento'], [2, '2 agendamentos'], [3, '3 agendamentos
 const CANCEL = [[60, '1 hora antes'], [120, '2 horas antes'], [180, '3 horas antes'], [360, '6 horas antes'], [720, '12 horas antes'], [1440, '1 dia antes'], [2880, '2 dias antes']];
 const INTERVALO = [[5, '5 minutos'], [10, '10 minutos'], [15, '15 minutos'], [20, '20 minutos'], [30, '30 minutos'], [45, '45 minutos'], [60, '1 hora'], [90, '1 hora e 30 minutos'], [120, '2 horas']];
 const UFS = 'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ');
-const ABAS = [['regras', 'Regras de agendamento'], ['empresa', 'Dados da empresa'], ['horarios', 'Horários de funcionamento'], ['datas', 'Datas bloqueadas'], ['pagina', 'Página de agendamento'],
+const ABAS = [['regras', 'Regras de agendamento'], ['empresa', 'Dados da empresa'], ['horarios', 'Horários de funcionamento'], ['datas', 'Datas bloqueadas'],
   ['mensagens', 'Mensagens'], ['pagamentos', 'Pagamentos PIX'], ['campos', 'Campos personalizados']];
 
-export function Configuracoes({ ctx }) {
-  const [aba, setAba] = useState('regras');
+export const PaginaAgendamento = ({ ctx }) => html`<${Configuracoes} ctx=${ctx} so="pagina" />`;
+
+export function Configuracoes({ ctx, so }) {
+  const [aba, setAba] = useState(so || 'regras');
   const f = useForm(structuredClone(ctx.empresa));
   const [sujo, setSujo] = useState(false);
   const v = f.v, c = v.config;
@@ -42,10 +44,10 @@ export function Configuracoes({ ctx }) {
 
   return html`
     <div class="pagina">
-      <div class="titulo"><h1>Configurações</h1>
-        ${aba !== 'datas' && aba !== 'campos' ? html`${sujo ? html`<span class="selo parcial">Alterações não salvas</span>` : ''}<button class="btn" onClick=${salvar}>Salvar configurações</button>` : ''}
+      <div class="titulo">${so ? html`<div><h1>Página de agendamento</h1><p class="mudo">É o que seus clientes veem ao abrir o seu link. A prévia acompanha o que você muda.</p></div>` : html`<h1>Configurações</h1>`}
+        ${aba !== 'datas' && aba !== 'campos' ? html`${sujo ? html`<span class="selo parcial">Alterações não salvas</span>` : ''}<button class="btn" onClick=${salvar}>${so ? 'Salvar página' : 'Salvar configurações'}</button>` : ''}
       </div>
-      <div class="abas">${ABAS.map(([k, t]) => html`<button class=${aba === k ? 'on' : ''} onClick=${() => setAba(k)}>${t}</button>`)}</div>
+      ${so ? '' : html`<div class="abas">${ABAS.map(([k, t]) => html`<button class=${aba === k ? 'on' : ''} onClick=${() => setAba(k)}>${t}</button>`)}</div>`}
 
       ${aba === 'regras' ? html`
         <section class="bloco">
@@ -170,8 +172,10 @@ export function Configuracoes({ ctx }) {
         </section>` : ''}
 
       ${aba === 'pagina' ? html`
+       <div class="editor-pagina">
+        <div>
         <section class="bloco">
-          <h2>Página</h2>
+          <h2>Link e status</h2>
           <div class="grade2">
             <${Campo} label="Status da página de agendamento" dica="Desativada, os clientes não conseguem marcar horários.">
               <select value=${v.pagina_ativa ? '1' : '0'} onChange=${e => set('pagina_ativa', e.target.value === '1')}><option value="1">Ativada</option><option value="0">Desativada</option></select>
@@ -194,14 +198,6 @@ export function Configuracoes({ ctx }) {
           <${Campo} label="Cor do sistema e da página" dica="Vale para o seu painel e para a página que seus clientes veem.">
             <${SeletorCor} valor=${v.cor_tema} onChange=${x => set('cor_tema', x)} />
           <//>
-          <h3>Prévia</h3>
-          <div class="previa-pagina" style=${`--tema:${v.cor_tema}`}>
-            <div class="pp-capa" style=${v.capa_url ? `background-image:url('${v.capa_url}')` : ''}></div>
-            <div class="pp-cartao">
-              <div class="pp-logo" style=${v.logo_url ? `background-image:url('${v.logo_url}')` : ''}>${v.logo_url ? '' : (v.nome || '?')[0]}</div>
-              <b>${v.nome}</b><small>${v.slogan}</small><span class="pp-btn">Agendar agora</span>
-            </div>
-          </div>
         </section>
         <section class="bloco">
           <h2>Fotos da empresa</h2>
@@ -223,7 +219,24 @@ export function Configuracoes({ ctx }) {
           <${Chk} label="Botão “Agendar agora” (sempre ativo)" checked disabled />
           ${[['servicos', 'Serviços'], ['equipe', 'Equipe'], ['localizacao', 'Localização'], ['horarios', 'Horários de funcionamento'], ['redes', 'Redes sociais']].map(([k, t]) => html`
             <${Chk} label=${t} checked=${secoes[k] !== false} onChange=${e => cfg('secoes', { ...secoes, [k]: e.target.checked })} />`)}
-        </section>` : ''}
+        </section>
+        </div>
+        <aside>
+          <div class="celular">
+            <div class="previa-pagina" style=${`--tema:${v.cor_tema}`}>
+              <div class="pp-capa" style=${v.capa_url ? `background-image:url('${v.capa_url}')` : ''}></div>
+              <div class="pp-cartao">
+                <div class="pp-logo" style=${v.logo_url ? `background-image:url('${v.logo_url}')` : ''}>${v.logo_url ? '' : (v.nome || '?')[0]}</div>
+                <b>${v.nome}</b><small>${v.slogan}</small><span class="pp-btn">Agendar agora</span>
+              </div>
+              ${msg.ativo && (msg.titulo || msg.texto) ? html`<div class="pp-recado"><b>${msg.titulo}</b>${msg.texto}</div>` : ''}
+              <div class="pp-secoes">${[['servicos', 'Serviços'], ['equipe', 'Equipe'], ['localizacao', 'Localização'], ['horarios', 'Horários'], ['redes', 'Redes sociais']]
+                .filter(([k]) => secoes[k] !== false).map(([, t]) => html`<span>${t}</span>`)}</div>
+            </div>
+          </div>
+          <div class="pp-status"><${Selo} tipo=${v.pagina_ativa ? 'ok' : 'nao'}>${v.pagina_ativa ? 'Página no ar' : 'Página desativada'}<//><a href=${link} target="_blank">Abrir página</a></div>
+        </aside>
+       </div>` : ''}
     </div>`;
 }
 

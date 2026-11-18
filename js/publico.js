@@ -455,7 +455,7 @@ function Pagina() {
             <div class="galeria">${x.galeria.map((u, i) => html`<button class="foto-g" style=${`background-image:url('${u}')`} onClick=${() => setZoom(u)} aria-label=${`Ampliar foto ${i + 1}`}></button>`)}</div>` : ''}
           ${sec.equipe !== false && d.equipe.length ? html`
             <h2 class="secao">Nossa equipe</h2>
-            <div class="equipe">${d.equipe.map(p => html`<div><i class="avatar grande" style=${p.foto_url ? `background-image:url('${p.foto_url}')` : ''}>${p.foto_url ? '' : p.nome[0]}</i><span>${p.nome}</span></div>`)}</div>` : ''}
+            <div class="equipe">${d.equipe.map(p => html`<div><i class="fita"></i><i class="avatar grande" style=${p.foto_url ? `background-image:url('${p.foto_url}')` : ''}>${p.foto_url ? '' : p.nome[0]}</i><span>${p.nome}</span></div>`)}</div>` : ''}
           ${sec.localizacao !== false ? html`
             <h2 class="secao">Localização</h2>
             <div class="cartao-pub">${endereco ? html`<p>${endereco}</p><a class="btn sec peq" target="_blank" href=${'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(endereco)}>Ver no mapa</a>`
