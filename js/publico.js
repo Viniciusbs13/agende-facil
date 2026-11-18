@@ -336,12 +336,44 @@ function Conta({ d, x }) {
       <//>` : ''}`;
 }
 
+/* ---------- catálogo: fotos e vídeos de um serviço ---------- */
+function VerServico({ s, ms, onClose, onAgendar }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const f = e => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', f);
+    document.body.classList.add('sem-rolagem');
+    return () => { document.removeEventListener('keydown', f); document.body.classList.remove('sem-rolagem'); };
+  }, []);
+  const rolar = e => setI(Math.round(e.target.scrollLeft / e.target.clientWidth));
+  return html`
+    <div class="visor" role="dialog" aria-label=${s.nome} onClick=${e => e.target === e.currentTarget && onClose()}>
+      <div class="visor-caixa">
+        <button class="x" onClick=${onClose} aria-label="Fechar">×</button>
+        ${ms.length ? html`
+          <div class="carrossel" onScroll=${rolar}>
+            ${ms.map(m => html`<div class="quadro">${m.tipo === 'video'
+              ? html`<video src=${m.url} controls playsinline preload="metadata"></video>`
+              : html`<img src=${m.url} alt=${s.nome} />`}</div>`)}
+          </div>
+          ${ms.length > 1 ? html`<div class="pontos">${ms.map((_, j) => html`<i class=${j === i ? 'on' : ''}></i>`)}</div>` : ''}` : ''}
+        <div class="visor-txt">
+          <h2>${s.nome}</h2>
+          <p><b>${preco(s)}</b> <span class="mudo">· ${duracaoTxt(s.duracao)}</span></p>
+          ${s.descricao ? html`<p class="mudo">${s.descricao}</p>` : ''}
+          <button class="btn largo" onClick=${onAgendar}>Agendar este serviço</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 /* ---------- página ---------- */
 const REDES = [['instagram', 'Instagram'], ['facebook', 'Facebook'], ['tiktok', 'TikTok'], ['youtube', 'YouTube'], ['twitter', 'X']];
 function Pagina() {
   const [d, setD] = useState(undefined);
   const [fluxo, setFluxo] = useState(null);
-  const [x, setX] = useState({ pix: null, campos: [], ramo: null, galeria: [] });
+  const [x, setX] = useState({ pix: null, campos: [], ramo: null, galeria: [], midias: {} });
+  const [ver, setVer] = useState(null);
   const [zoom, setZoom] = useState(null);
   const [volta, setVolta] = useState(0);
   // retorno do Mercado Pago: confere o pagamento e mostra a Área do Cliente
@@ -377,6 +409,8 @@ function Pagina() {
   const e = d.empresa, sec = e.config.secoes || {}, msg = e.config.mensagem_pagina || {};
   const endereco = [e.logradouro && `${e.logradouro}${e.numero ? ', ' + e.numero : ''}`, e.complemento, e.bairro, e.cidade && `${e.cidade}${e.estado ? ' - ' + e.estado : ''}`, e.cep].filter(Boolean).join(' · ');
   const redes = REDES.filter(([k]) => e[k]);
+  const midiasDe = s => (x.midias || {})[s.id] || (s.foto_url ? [{ url: s.foto_url, tipo: 'foto' }] : []);
+  const catalogo = d.servicos.some(s => midiasDe(s).length);
   const grupos = [...d.categorias.map(c => [c, d.servicos.filter(s => s.categoria_id === c.id)]), [{ nome: 'Outros serviços' }, d.servicos.filter(s => !d.categorias.some(c => c.id === s.categoria_id))]].filter(g => g[1].length);
 
   return html`
@@ -397,12 +431,25 @@ function Pagina() {
             <h2 class="secao">Serviços</h2>
             ${grupos.map(([c, ss]) => html`
               ${grupos.length > 1 || c.id ? html`<h3 class="cat">${c.nome}</h3>` : ''}
-              <div class="servicos">${ss.map(s => html`
-                <div class="servico">
-                  ${s.foto_url ? html`<div class="foto" style=${`background-image:url('${s.foto_url}')`}></div>` : ''}
-                  <div class="txt"><b>${s.nome}</b>${s.descricao ? html`<small class="mudo">${s.descricao}</small>` : ''}<small>${duracaoTxt(s.duracao)} · <b>${preco(s)}</b></small></div>
-                  <button class="btn peq" onClick=${() => setFluxo({ servico: s.id })}>Agendar</button>
-                </div>`)}</div>`)}` : ''}
+              <div class=${catalogo ? 'catalogo' : 'servicos'}>${ss.map(s => {
+                const ms = midiasDe(s), capa = ms[0];
+                return catalogo ? html`
+                  <article class="item">
+                    <button class="item-capa" onClick=${() => setVer(s)} aria-label=${`Ver fotos de ${s.nome}`}>
+                      ${!capa ? html`<span class="sem-foto">${s.nome[0]}</span>` : capa.tipo === 'video'
+                        ? html`<video src=${capa.url} muted playsinline preload="metadata"></video><span class="play">▶</span>`
+                        : html`<img src=${capa.url} alt=${s.nome} loading="lazy" />`}
+                      ${ms.length > 1 ? html`<span class="conta">1/${ms.length}</span>` : ''}
+                    </button>
+                    <div class="item-txt"><b>${s.nome}</b>${s.descricao ? html`<small class="mudo">${s.descricao}</small>` : ''}
+                      <small>${duracaoTxt(s.duracao)} · <b>${preco(s)}</b></small></div>
+                    <button class="btn peq" onClick=${() => setFluxo({ servico: s.id })}>Agendar</button>
+                  </article>` : html`
+                  <div class="servico">
+                    <div class="txt"><b>${s.nome}</b>${s.descricao ? html`<small class="mudo">${s.descricao}</small>` : ''}<small>${duracaoTxt(s.duracao)} · <b>${preco(s)}</b></small></div>
+                    <button class="btn peq" onClick=${() => setFluxo({ servico: s.id })}>Agendar</button>
+                  </div>`;
+              })}</div>`)}` : ''}
           ${(x.galeria || []).length ? html`
             <h2 class="secao">Fotos</h2>
             <div class="galeria">${x.galeria.map((u, i) => html`<button class="foto-g" style=${`background-image:url('${u}')`} onClick=${() => setZoom(u)} aria-label=${`Ampliar foto ${i + 1}`}></button>`)}</div>` : ''}
@@ -422,6 +469,7 @@ function Pagina() {
             <div class="redes">${redes.map(([k, t]) => html`<a class="btn sec" target="_blank" rel="noopener" href=${e[k]}>${t}</a>`)}</div>` : ''}`}
       </div>
       ${!conta && !fluxo ? html`<div class="barra-fixa"><button class="btn largo" onClick=${() => setFluxo({})}>Agendar agora</button></div>` : ''}
+      ${ver ? html`<${VerServico} s=${ver} ms=${midiasDe(ver)} onClose=${() => setVer(null)} onAgendar=${() => { setFluxo({ servico: ver.id }); setVer(null); }} />` : ''}
       ${zoom ? html`<div class="zoom" onClick=${() => setZoom(null)} role="dialog" aria-label="Foto ampliada"><img src=${zoom} alt="Foto da empresa" /><button class="x" aria-label="Fechar">×</button></div>` : ''}
       <footer class="rodape-pub">Agendamento online por <b>${APP_NOME}</b></footer>
       ${fluxo ? html`<${Fluxo} d=${d} x=${x} inicial=${fluxo.servico} onClose=${() => setFluxo(null)} />` : ''}

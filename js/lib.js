@@ -371,3 +371,40 @@ export function SeletorCor({ valor, onChange }) {
       <label class="cor-livre" title="Escolher outra cor"><input type="color" value=${/^#[0-9a-f]{6}$/.test(v) ? v : '#5b4bff'} onInput=${e => onChange(e.target.value)} /><span>Outra cor</span></label>
     </div>`;
 }
+
+/* ---------- fotos e vídeos (catálogo do serviço) ---------- */
+export function Midias({ valor, onChange, pasta, max = 12 }) {
+  const lista = valor || [];
+  const [env, setEnv] = useState(false);
+  const enviar = async e => {
+    const arqs = [...e.target.files].slice(0, max - lista.length);
+    if (!arqs.length) return;
+    setEnv(true);
+    const novas = [];
+    await tentar(async () => {
+      for (const a of arqs) {
+        const video = a.type.startsWith('video/');
+        if (a.size > (video ? 40 : 8) * 1024 * 1024) throw new Error(video ? 'Cada vídeo deve ter até 40 MB.' : 'Cada foto deve ter até 8 MB.');
+        const caminho = `${pasta}/${crypto.randomUUID()}.${(a.name.split('.').pop() || (video ? 'mp4' : 'jpg')).toLowerCase()}`;
+        const { error } = await db.storage.from('imagens').upload(caminho, a, { contentType: a.type || undefined });
+        if (error) throw new Error(error.message);
+        novas.push({ url: db.storage.from('imagens').getPublicUrl(caminho).data.publicUrl, tipo: video ? 'video' : 'foto' });
+      }
+    });
+    if (novas.length) onChange([...lista, ...novas]);
+    setEnv(false);
+    e.target.value = '';
+  };
+  const antes = i => { const n = [...lista]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; onChange(n); };
+  return html`
+    <div class="galeria-ed">
+      ${lista.map((m, i) => html`
+        <div class="foto-ed" style=${m.tipo === 'foto' ? `background-image:url('${m.url}')` : ''}>
+          ${m.tipo === 'video' ? html`<video src=${m.url} muted playsinline preload="metadata"></video><span class="tag v">Vídeo</span>` : ''}
+          ${i === 0 ? html`<span class="tag">Capa</span>` : html`<button type="button" class="esq" aria-label="Mover para antes" title="Mover para antes" onClick=${() => antes(i)}>‹</button>`}
+          <button type="button" aria-label="Remover" onClick=${() => onChange(lista.filter((_, j) => j !== i))}>×</button>
+        </div>`)}
+      ${lista.length < max ? html`<label class="foto-add">${env ? 'Enviando…' : '+ Fotos ou vídeos'}
+        <input type="file" accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime" multiple hidden onChange=${enviar} disabled=${env} /></label>` : ''}
+    </div>`;
+}

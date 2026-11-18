@@ -1,6 +1,6 @@
 // Cadastros: clientes, serviços, categorias, adicionais e profissionais.
 import { html, useState, useEffect, db, q, tentar, toast, useForm, Campo, Chk, Modal, Imagem, Horarios, horariosValidos, Lista, Selo,
-  brl, fone, fData, hoje, duracaoTxt, DIAS_C, NIVEIS, CamposExtras } from './lib.js';
+  brl, fone, fData, hoje, duracaoTxt, DIAS_C, NIVEIS, CamposExtras, Midias } from './lib.js';
 
 /* ---------- estrutura genérica de cadastro ---------- */
 function Crud(p) {
@@ -183,7 +183,7 @@ function Ordenar({ linhas, carregar }) {
 export const Servicos = ({ ctx }) => html`<${Crud} ctx=${ctx} titulo="Serviços" singular="serviço" btnNovo="Adicionar serviço"
   tabela="servicos" ordem="ordem" largura=${720} extraBtn=${Ordenar}
   select="*, categoria:categorias(nome), servico_profissional(profissional_id), adicional_servico(adicional_id)"
-  campos=${['nome', 'descricao', 'categoria_id', 'duracao', 'preco', 'sob_consulta', 'a_partir_de', 'exigir_pix', 'comissao', 'foto_url', 'observacoes', 'ativo', 'visivel']}
+  campos=${['nome', 'descricao', 'categoria_id', 'duracao', 'preco', 'sob_consulta', 'a_partir_de', 'exigir_pix', 'comissao', 'foto_url', 'midias', 'observacoes', 'ativo', 'visivel']}
   numeros=${['duracao', 'preco', 'comissao']}
   extra=${async () => {
     const [categorias, profissionais, adicionais] = await Promise.all([
@@ -194,7 +194,7 @@ export const Servicos = ({ ctx }) => html`<${Crud} ctx=${ctx} titulo="Serviços"
     return { categorias, profissionais, adicionais };
   }}
   novo=${x => ({ nome: '', descricao: '', categoria_id: x.categorias?.[0]?.id || '', duracao: 30, preco: '', sob_consulta: false, a_partir_de: false,
-    exigir_pix: false, comissao: '', foto_url: null, observacoes: '', ativo: true, visivel: true,
+    exigir_pix: false, comissao: '', foto_url: null, midias: [], observacoes: '', ativo: true, visivel: true,
     _profs: (x.profissionais || []).map(p => p.id), _adics: [], _nova: '' })}
   abrir=${l => ({ ...l, _profs: l.servico_profissional.map(x => x.profissional_id), _adics: l.adicional_servico.map(x => x.adicional_id), _nova: '' })}
   validar=${v => (!v.nome?.trim() ? 'Informe o nome do serviço.' : !(Number(v.duracao) > 0) ? 'Informe a duração em minutos.'
@@ -246,7 +246,10 @@ export const Servicos = ({ ctx }) => html`<${Crud} ctx=${ctx} titulo="Serviços"
     <${Chk} label="Mostrar “a partir de” antes do preço" ...${f.chk('a_partir_de')} />
     <${Chk} label="Exigir pagamento antecipado via PIX" dica="Só tem efeito quando o PIX estiver ativo nas configurações." ...${f.chk('exigir_pix')} />
     <${Campo} label="Descrição" dica="Opcional. Aparece para os clientes."><textarea rows="2" ...${f.txt('descricao')}></textarea><//>
-    <${Campo} label="Foto do serviço"><${Imagem} valor=${f.v.foto_url} onChange=${u => f.set('foto_url', u)} pasta=${ctx.empresa.id} /><//>
+    <${Campo} label="Fotos e vídeos do serviço" dica="Formam o catálogo que o cliente vê na página de agendamento. A primeira é a capa. Fotos até 8 MB, vídeos até 40 MB.">
+      <${Midias} valor=${f.v.midias} pasta=${ctx.empresa.id}
+        onChange=${m => f.setV(o => ({ ...o, midias: m, foto_url: (m.find(x => x.tipo === 'foto') || {}).url || null }))} />
+    <//>
     <${Obs} f=${f} />
     <${Campo} label="Adicionais disponíveis neste serviço">
       <${Marcar} itens=${extra.adicionais} valor=${f.v._adics} onChange=${x => f.set('_adics', x)} todos="Selecionar todos os adicionais" />
